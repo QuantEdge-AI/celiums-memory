@@ -234,6 +234,38 @@ const ethics_audit_handler = async (
     const reason      = String(args.reason ?? payload.reason ?? '');
     const blocked     = Boolean(args.blocked ?? payload.blocked ?? false);
 
+    // Validate scores payload to prevent DoS via massive JSON payloads
+    let validScores: any = null;
+    if (scores !== null && scores !== undefined) {
+      if (typeof scores !== 'object' || Array.isArray(scores)) {
+        const err: any = new Error('Invalid param: scores must be a JSON object');
+        err.code = -32602;
+        throw err;
+      }
+
+      const keys = Object.keys(scores);
+      if (keys.length > 50) {
+        const err: any = new Error('Payload too large: scores object contains too many keys');
+        err.code = -32602;
+        throw err;
+      }
+
+      validScores = {};
+      for (const k of keys) {
+        if (typeof k !== 'string' || k.length > 100) {
+          const err: any = new Error('Invalid param: score keys must be strings under 100 characters');
+          err.code = -32602;
+          throw err;
+        }
+        if (typeof scores[k] !== 'number') {
+          const err: any = new Error('Invalid param: score values must be numbers');
+          err.code = -32602;
+          throw err;
+        }
+        validScores[k] = scores[k];
+      }
+    }
+
     // Prefer explicit contentHash; otherwise hash the content
     const contentHash = args.contentHash ?? args.content_hash
       ?? (content ? createHash('sha256').update(content).digest('hex').slice(0, 16) : null);
@@ -251,7 +283,7 @@ const ethics_audit_handler = async (
         blocked,
         contentHash,
         categories,
-        scores ? JSON.stringify(scores) : null,
+        validScores ? JSON.stringify(validScores) : null,
         decision,
       ],
     );
