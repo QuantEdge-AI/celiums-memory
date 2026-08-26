@@ -260,10 +260,17 @@ const handleSourceAdd: McpToolHandler = async (args, ctx) => {
   );
   const sourceId = String(ins.rows[0].id);
   const chunks = chunkText(text);
-  for (let i = 0; i < chunks.length; i++) {
+  if (chunks.length > 0) {
+    const values = [];
+    const params = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const offset = i * 4;
+      values.push(`($${offset + 1},$${offset + 2},$${offset + 3},$${offset + 4})`);
+      params.push(sourceId, projectId, i, chunks[i]);
+    }
     await pool.query(
-      `INSERT INTO research_source_chunks (source_id, project_id, idx, content) VALUES ($1,$2,$3,$4)`,
-      [sourceId, projectId, i, chunks[i]],
+      `INSERT INTO research_source_chunks (source_id, project_id, idx, content) VALUES ${values.join(',')}`,
+      params,
     );
   }
   await pool.query(`UPDATE research_sources SET chunk_count=$2 WHERE id=$1`, [sourceId, chunks.length]);
