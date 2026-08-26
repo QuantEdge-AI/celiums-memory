@@ -18,6 +18,7 @@
 
 import type { RegisteredTool, McpToolHandler, McpToolResult, McpToolContext } from './types.js';
 import { llmChat, llmConfigured } from '../llm-client.js';
+import { basename } from 'node:path';
 
 // Optional corpus search backend. Set CELIUMS_SEARCH_URL to a service that
 // implements POST /v1/search { query, limit } -> { results: [...] }.
@@ -245,8 +246,14 @@ const handleSourceAdd: McpToolHandler = async (args, ctx) => {
       // 'text' | 'file' — the client sends already-extracted UTF-8 text.
       text = String(args.content ?? '');
       bytes = Buffer.byteLength(text);
-      uri = kind === 'file' ? (name || 'file.txt') : null;
-      name = name || (kind === 'file' ? 'Uploaded file' : 'Pasted text');
+      let safeName = name;
+      if (kind === 'file' && name) {
+        // Sanitize name to prevent path traversal issues since this becomes the URI/filename.
+        // Replace windows-style slashes before taking the basename just in case.
+        safeName = basename(name.replace(/\\/g, '/'));
+      }
+      uri = kind === 'file' ? (safeName || 'file.txt') : null;
+      name = safeName || (kind === 'file' ? 'Uploaded file' : 'Pasted text');
     }
   } catch (e) {
     return err(`source extraction failed: ${(e as Error).message}`);
