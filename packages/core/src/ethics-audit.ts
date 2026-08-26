@@ -60,18 +60,6 @@ export async function logEthicsAudit(
       ...record,
     }));
   } catch {}
-
-  // If database is available, also persist
-  try {
-    // Dynamic import to avoid forcing DB dependency on all consumers
-    // const { pool } = await import('./db.js');
-    // await pool.query(
-    //   'INSERT INTO ethics_audit (content_hash, timestamp, ...) VALUES ($1, $2, ...)',
-    //   [...]
-    // );
-  } catch {
-    // DB logging is best-effort
-  }
 }
 
 /**
@@ -79,14 +67,6 @@ export async function logEthicsAudit(
  * For authority/fiscal review.
  */
 export async function queryAuditByHash(contentHash: string): Promise<AuditRecord[]> {
-  try {
-    // const { pool } = await import('./db.js');
-    // const result = await pool.query(
-    //   'SELECT * FROM ethics_audit WHERE content_hash = $1 ORDER BY timestamp DESC',
-    //   [contentHash]
-    // );
-    // return result.rows;
-  } catch {}
   return [];
 }
 
@@ -94,13 +74,5 @@ export async function queryAuditByHash(contentHash: string): Promise<AuditRecord
  * Query recent audit records for review dashboard.
  */
 export async function queryRecentAudit(limit: number = 50): Promise<AuditRecord[]> {
-  try {
-    // const { pool } = await import('./db.js');
-    // const result = await pool.query(
-    //   'SELECT * FROM ethics_audit ORDER BY timestamp DESC LIMIT $1',
-    //   [limit]
-    // );
-    // return result.rows;
-  } catch {}
   return [];
 }
