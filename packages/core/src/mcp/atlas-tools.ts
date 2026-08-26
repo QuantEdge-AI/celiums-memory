@@ -375,7 +375,7 @@ STANDARD
 - Structure to the genuine conventions of a ${type}. A reader should recognize it as a real ${type}, not an essay labelled one.
 - Concrete and verifiable: real commands, code, config, decision criteria — not "you should consider…".
 - Complete for its purpose, but every section earns its place. No filler, no padding, no restating the topic back.
-- Do not invent specifics (versions, numbers, APIs). Where something is genuinely unknown, mark it as an explicit assumption or TODO.
+- Do not invent specifics (versions, numbers, APIs). Where something is genuinely unknown, mark it as an explicit assumption or TBD.
 
 Output ONLY the finished ${type}, in Markdown, starting at its title.`;
 
