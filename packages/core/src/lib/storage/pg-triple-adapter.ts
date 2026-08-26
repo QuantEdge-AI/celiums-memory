@@ -185,12 +185,20 @@ export class PgTripleAdapter implements StorageAdapter {
       return { memories: ordered, resolution: 'delegated_vector' };
     }
     // Tag-only or full scan fallback.
-    const tagPredicate = input.tags && input.tags.length > 0
-      ? `AND tags @> $4::jsonb` : '';
     const params: unknown[] = [input.tenantId, input.userId, input.limit];
-    if (tagPredicate) params.push(JSON.stringify(input.tags));
-    const importanceClause = input.minImportance !== undefined
-      ? `AND importance >= ${input.minImportance.toFixed(4)}` : '';
+
+    let tagPredicate = '';
+    if (input.tags && input.tags.length > 0) {
+      params.push(JSON.stringify(input.tags));
+      tagPredicate = `AND tags @> $${params.length}::jsonb`;
+    }
+
+    let importanceClause = '';
+    if (input.minImportance !== undefined) {
+      params.push(input.minImportance);
+      importanceClause = `AND importance >= $${params.length}`;
+    }
+
     const { rows } = await this.opts.pool.query(
       `SELECT * FROM secure_memories
         WHERE tenant_id IS NOT DISTINCT FROM $1
