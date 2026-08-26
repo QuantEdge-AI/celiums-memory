@@ -26,10 +26,15 @@ export async function migrate() {
         const files = (await readdir(migrationsDir))
             .filter((f) => f.endsWith('.sql'))
             .sort();
-        for (const f of files) {
-            const sql = await readFile(join(migrationsDir, f), 'utf8');
-            await client.query(sql);
-            console.log('[celiums-atlas] applied:', f);
+
+        // Pre-read all migrations to avoid sequential file I/O latency
+        const sqlTexts = await Promise.all(
+            files.map((f) => readFile(join(migrationsDir, f), 'utf8'))
+        );
+
+        for (let i = 0; i < files.length; i++) {
+            await client.query(sqlTexts[i]);
+            console.log('[celiums-atlas] applied:', files[i]);
         }
     }
     finally {
