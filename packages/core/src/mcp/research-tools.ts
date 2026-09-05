@@ -16,6 +16,7 @@
  * via ensureResearchSchema(pool) on first call).
  */
 
+import { lookup } from 'node:dns/promises';
 import type { RegisteredTool, McpToolHandler, McpToolResult, McpToolContext } from './types.js';
 import { llmChat, llmConfigured } from '../llm-client.js';
 
@@ -172,14 +173,70 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+function isPrivateIp(ip: string): boolean {
+  if (ip.startsWith('::ffff:')) return isPrivateIp(ip.slice(7));
+  if (ip === '0.0.0.0' || ip === '255.255.255.255' || ip === '::' || ip === '::1') return true;
+  if (ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('169.254.')) return true;
+  if (ip.startsWith('192.168.')) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  if (/^[fF][cCdD]/.test(ip)) return true; // IPv6 ULA
+  if (/^[fF][eE][89aAbB]/.test(ip)) return true; // IPv6 Link-local
+  return false;
+}
+
+async function ensureSafeUrl(urlStr: string): Promise<void> {
+  const parsed = new URL(urlStr);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('invalid protocol');
+  }
+
+  const hostname = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
+  if (hostname.toLowerCase() === 'localhost') {
+    throw new Error('local URLs are not allowed');
+  }
+
+  // Fail closed on DNS errors.
+  const { address } = await lookup(hostname);
+  if (isPrivateIp(address)) {
+    throw new Error('local URLs are not allowed');
+  }
+}
+
 async function extractFromUrl(url: string): Promise<{ text: string; bytes: number }> {
+  let currentUrl = url;
+  let redirects = 5;
+  let res: Response | null = null;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 12000);
-  const res = await fetch(url, {
-    signal: ctrl.signal,
-    headers: { 'User-Agent': 'Celiums-Research/1.0 (+https://celiums.ai)' },
-  }).finally(() => clearTimeout(t));
+
+  try {
+    while (redirects > 0) {
+      await ensureSafeUrl(currentUrl);
+      res = await fetch(currentUrl, {
+        signal: ctrl.signal,
+        redirect: 'manual',
+        headers: { 'User-Agent': 'Celiums-Research/1.0 (+https://celiums.ai)' },
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (!location) throw new Error(`redirect ${res.status} missing location`);
+        currentUrl = new URL(location, currentUrl).href;
+        redirects--;
+      } else {
+        break;
+      }
+    }
+  } finally {
+    clearTimeout(t);
+  }
+
+  if (!res) throw new Error('fetch failed entirely');
+  if (redirects === 0 && res.status >= 300 && res.status < 400) {
+    throw new Error('too many redirects');
+  }
   if (!res.ok) throw new Error(`fetch ${res.status}`);
+
   const raw = await res.text();
   const text = /<\/?[a-z]/i.test(raw.slice(0, 2000)) ? stripHtml(raw) : raw.trim();
   if (!text) throw new Error('no extractable text at URL');
